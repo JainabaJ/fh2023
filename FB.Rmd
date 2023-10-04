@@ -1,0 +1,417 @@
+---
+title: "Is there a significant difference in cancers incidence rates between different racial and ethnic groups in a specific region?"
+author: "Jainaba Jawara"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(purrr)
+#install.packages('forcats')
+library(forcats)
+library(tidyverse)
+
+#install.packages('car')
+
+by_area_file <- read_delim(file = "USCS-1999-2020-ASCII/BYAREA.TXT", delim = "|")
+View(by_area_file)
+
+```
+
+
+## preproccssing
+NOTES( talk about why i dropped ~)
+when doing the gender graphs look to the SEX carefully 
+
+```{r preproccssing }
+by_area_df <- by_area_file %>% select(AREA,SEX,YEAR,POPULATION,RACE,EVENT_TYPE,SITE,AGE_ADJUSTED_RATE,COUNT)
+by_area_df$RACE <- gsub("Non-Hispanic", "", by_area_df$RACE)
+by_area_df$COUNT <- as.numeric(gsub("[^0-9.]", "", by_area_df$COUNT))
+by_area <- by_area_df %>% na.omit()
+by_area <- by_area %>%
+  filter(YEAR != '2016-2020')
+
+
+by_area <- by_area %>% mutate(incidence_100k = (COUNT / POPULATION) * 100000)
+# check crude
+
+colnames(by_area)
+
+```
+
+filter this more to 'male and female'[SEX]
+```{r total_incidence_by_race, echo=FALSE}
+total_incidence_by_race <- by_area  %>% 
+  group_by(RACE) %>% 
+  filter(EVENT_TYPE == 'Incidence') %>% 
+  filter(SITE == "All Cancer Sites Combined") %>% 
+  filter(SEX == 'Male and Female') %>% 
+  summarize(total_incidence = sum(COUNT)) %>% 
+  filter(RACE != 'All Races') 
+
+
+total_incidence_by_race
+
+```
+
+```{r total_incidence_by_race2, echo=FALSE}
+incidence_100k_by_race <- by_area  %>% 
+  group_by(RACE) %>% 
+  filter(SEX == 'Male and Female') %>%
+  summarize(incidence_per_100k = mean(incidence_100k)) %>% 
+  filter(RACE != 'All Races')
+
+incidence_100k_by_race
+print(class(incidence_100k_by_race))
+```
+
+```{r mean_incidence_by_cancer_race}
+
+colnames(by_area)
+mean_incidence_by_cancer_race <- by_area %>%
+  group_by(SITE,RACE)%>%
+  filter(RACE != 'All Races') %>%
+  filter(SEX == 'Male and Female') %>%
+  filter(SITE != 'All Cancer Sites Combined') %>% 
+  summarize(incidence_per_100k = mean(incidence_100k))
+
+View(mean_incidence_by_cancer_race)
+bar_plot_cancer <- ggplot(mean_incidence_by_cancer_race, aes(x = SITE, y = incidence_per_100k)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Mean Cancer Incidence Rates by Cancer Site",
+       x = "Cancer Site",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+bar_plot_cancer_vs_race <- ggplot(mean_incidence_by_cancer_race, aes(x = SITE, y = incidence_per_100k, fill = RACE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Mean Cancer Incidence Rates by Cancer Site and Race",
+       x = "Cancer Site",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+box_plot_cancer_vs_race <- ggplot(mean_incidence_by_cancer_race, aes(x = RACE, y = incidence_per_100k)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Cancer Incidence Rates by Racial and Ethnic Groups per 100,000 people",
+       x = "Racial and Ethnic Groups",
+       y = "Cancer Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+bar_plot_cancer
+# Display the box plot
+box_plot_cancer_vs_race
+bar_plot_cancer
+bar_plot_cancer_vs_race
+
+```
+
+Total Incidence by Year 
+
+```{r Total Incidence by Year , echo=FALSE}
+total_incidence_by_year <- by_area%>% 
+  group_by(YEAR,RACE) %>% 
+  filter(SEX == 'Male and Female') %>%
+  filter(SITE != 'All Cancer Sites Combined') %>% 
+  filter(RACE != 'All Races') %>% 
+  filter(EVENT_TYPE == 'Incidence') %>% 
+  summarize(total_incidencek = sum(incidence_100k),.groups = 'drop') %>% 
+  filter(YEAR != '2016-2020')
+  
+total_bar_plot_year <- ggplot(total_incidence_by_year, aes(x = YEAR, y = total_incidencek)) +
+  geom_bar(stat = "identity", fill = "lightcoral") +
+  labs(title = "Cancer Incidence Rates by Race from 1999 -2020  per 100,000 people",
+       x = "Race",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle =60 , vjust = 0.5, hjust=1))
+
+
+total_bar_plot_year_race <- ggplot(total_incidence_by_year, aes(x = YEAR, y =total_incidencek, fill = RACE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = " Cancer Incidence Rates by Race from 1999 -2020 per 100,000 people",
+       x = "Cancer Site",
+       y = "Total Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+total_bar_plot_year
+total_bar_plot_year_race
+
+
+```
+Mean Incidence by Year 
+
+change to boxplot( so i can see max and mix)
+add"geom_jitter"
+make the width smaller/narrow
+make the points clear(look in to alpha)
+maybe look into (geom_smooth) look into "group"
+
+
+
+general notes
+- scatter plots 
+
+- if you want to look into orange question
+  -census data
+  - package data usdata?
+      - Look into docs for it 
+      - dataset: look into the doc
+      - look in the slack for another one 
+  
+
+```{r  Mean Incidence by Year, echo=FALSE}
+mean_incidence_by_year <- by_area%>% 
+  group_by(YEAR,RACE) %>% 
+  filter(SITE != 'All Cancer Sites Combined') %>% 
+  filter(RACE != 'All Races') %>% 
+  summarize(mean_incidencek = mean(incidence_100k),.groups = 'drop') %>% 
+  filter(YEAR != '2016-2020')
+  
+mean_bar_plot_year <- ggplot(mean_incidence_by_year, aes(x = YEAR, y = mean_incidencek)) +
+  geom_bar(stat = "identity", fill = "lightcoral") +
+  labs(title = "Mean Cancer Incidence Rates by Race from 1999 -2020 per 100,000 people",
+       x = "Year",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle =60 , vjust = 0.5, hjust=1))
+
+
+mean_bar_plot_year_race <- ggplot(mean_incidence_by_year, aes(x = YEAR, y =mean_incidencek, fill = RACE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Mean Cancer Incidence Rates by Race from 1999 -2020",
+       x = "Cancer Site",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+mean_bar_plot_year
+mean_bar_plot_year_race
+
+```
+
+
+``````{r  mean_incidence_by_area, echo=FALSE}
+mean_incidence_by_area <- by_area %>% 
+  group_by(AREA,RACE) %>% 
+  summarize(mean_incidencek = mean(incidence_100k)) %>% 
+  filter(AREA != 'United States (comparable to ICD-O-2)') %>% 
+  filter(RACE != 'All Races')
+mean_incidence_by_area
+
+  
+mean_bar_plot_area <- ggplot(mean_incidence_by_area, aes(x = AREA, y = mean_incidencek)) +
+  geom_bar(stat = "identity", fill = "lightcoral") +
+  labs(title = "Mean Cancer Incidence Rates by Race from 1999 -2020",
+       x = "State",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle =60 , vjust = 0.5, hjust=1))
+
+
+mean_bar_plot_area_race <- ggplot(mean_incidence_by_area, aes(x = AREA, y =mean_incidencek, fill = RACE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Mean Cancer Incidence Rates by State and Race ",
+       x = "State",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5))
+  
+mean_incidence_by_year <- by_area%>% 
+  group_by(YEAR,RACE,SITE) %>% 
+  filter(SITE != 'All Cancer Sites Combined') %>% 
+  filter(RACE != 'All Races') %>% 
+  filter(SEX == "Male and Female") %>% 
+  summarize(mean_incidencek = mean(incidence_100k),.groups = 'drop') %>% 
+  filter(YEAR != '2016-2020')
+
+  
+mean_bar_plot_year <- ggplot(mean_incidence_by_year, aes(x = YEAR, y = mean_incidencek)) +
+  geom_bar(stat = "identity", fill = "lightcoral") +
+  labs(title = "Mean Cancer Incidence Rates by Race from 1999 -2020 per 100,000 people",
+       x = "Race",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle =60 , vjust = 0.5, hjust=1))
+# add incidi. 
+top_5_highest <- mean_incidence_by_year %>%
+  filter(SITE != 'All Cancer Sites Combined') %>% 
+  filter(YEAR == '2019') %>% 
+  arrange(desc(mean_incidencek)) %>%
+  slice(1:5)
+head(top_5_highest)
+  
+lowest_5_lowest <- mean_incidence_by_year %>%
+  filter(SITE != 'All Cancer Sites Combined') %>% 
+  arrange(mean_incidencek) %>%
+  slice(1:5)
+View(top_5_highest)
+
+highest_cancers <- ggplot(top_5_highest, aes(x = SITE, y = mean_incidencek,fill = RACE)) +
+  geom_bar(stat = "identity", position = position_dodge2(preserve = "single")) +
+  labs(title = "Top 5 Mean Cancer Incidence Rates by Race from 1999 - 2020 per 100,000 people",
+       x = "Race",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust = 1))
+
+
+highest_cancers <- ggplot(top_5_highest, aes(x = SITE, y = mean_incidencek,fill = RACE)) +
+  geom_bar(stat = "identity", position = position_dodge2(preserve = "single")) +
+  labs(title = "Top 5 Mean Cancer Incidence Rates by Race from 1999 - 2020 per 100,000 people",
+       x = "Race",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust = 1))
+
+
+lowest_cancers <- ggplot(lowest_5_lowest, aes(x = YEAR, y = mean_incidencek)) +
+  geom_bar(stat = "identity", fill = "lightcoral") +
+  labs(title = "Lowest 5 Mean Cancer Incidence Rates by Race from 1999 - 2020 per 100,000 people",
+       x = "Race",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust = 1))
+
+
+
+mean_bar_plot_area
+mean_bar_plot_area_race
+
+
+top_5_highest_race <- ggplot(top_5_highest, aes(x = SITE, y = mean_incidencek, fill = RACE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Mean Cancer Incidence Rates by Cancer Site and Race",
+       x = "Cancer Site",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+
+lowest_5_highest_race <- ggplot(lowest_5_lowest, aes(x = SITE, y = mean_incidencek, fill = RACE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Mean Cancer Incidence Rates by Cancer Site and Race",
+       x = "Cancer Site",
+       y = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  
+#highest_cancers
+#lowest_cancers
+#top_5_highest_race
+#lowest_5_highest_race
+
+``````
+
+HEATMAP of location vs race 
+
+```{r  mean_incidence_by_area_state, echo=FALSE}
+mean_incidence_by_area_state <- by_area %>% 
+  filter(RACE != 'All Races') %>% 
+  filter(SEX == "Male and Female") %>% 
+  filter(SITE == 'All Cancer Sites Combined') %>% 
+  filter(AREA != 'United States (comparable to ICD-O-2)') %>% 
+  filter(EVENT_TYPE == 'Incidence') %>% 
+  group_by(AREA,RACE) %>%
+  summarise(mean_incidence = mean(incidence_100k, na.rm = TRUE)) 
+
+
+View(mean_incidence_by_area_state)
+
+
+mean_heatmap_area_race <- mean_incidence_by_area_state %>% 
+  ggplot(aes(x = AREA , y = RACE , fill = mean_incidence)) +
+  geom_tile() +
+  labs(title = "Mean Cancer Incidence Rates by State and Race",
+       x = "State",
+       y = "Race",
+       fill = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5))
+
+mean_heatmap_area_race
+
+```
+
+```{r  mean_incidence_by_area_FB, echo=FALSE}
+mean_incidence_by_area_state_FB <- by_area %>% 
+  filter(RACE != 'All Races') %>% 
+  filter(SEX == "Female") %>% 
+  filter(SITE == 'Female Breast') %>% 
+  filter(AREA != 'United States (comparable to ICD-O-2)') %>% 
+  filter(EVENT_TYPE == 'Incidence') %>% 
+  group_by(AREA,RACE) %>%
+  summarise(mean_incidence = mean(incidence_100k, na.rm = TRUE)) 
+
+
+mean_heatmap_area_race_FB <- mean_incidence_by_area_state_FB %>% 
+  ggplot(aes(x = AREA , y = RACE , fill = mean_incidence)) +
+  geom_tile() +
+  labs(title = "Mean Female Breast Cancer Incidence Rates by State and Race",
+       x = "State",
+       y = "Race",
+       fill = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5))
+
+
+mean_heatmap_area_race_FB
+```
+
+```{r  mean_incidence_by_areaFBM, echo=FALSE}
+mean_incidence_by_area_state_FBM <- by_area %>% 
+  filter(RACE != 'All Races') %>% 
+  filter(SEX == "Female") %>% 
+  filter(SITE == 'Female Breast') %>% 
+  filter(AREA != 'United States (comparable to ICD-O-2)') %>% 
+  filter(EVENT_TYPE == 'Mortality') %>% 
+  group_by(AREA,RACE) %>%
+  summarise(mean_incidence = mean(incidence_100k, na.rm = TRUE)) %>% 
+    drop_na()
+
+
+mean_heatmap_area_race_FBM <- mean_incidence_by_area_state_FBM %>% 
+  ggplot(aes(x = AREA , y = RACE , fill = mean_incidence)) +
+  geom_tile() +
+  labs(title = "Mean Breast Cancer Mortality Rates by State and Race",
+       x = "State",
+       y = "Race",
+       fill = "Mean Incidence Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5))
+
+
+mean_heatmap_area_race_FBM
+
+```
+
+```{r  ANOVA, echo=FALSE}
+anova_df <- by_area %>% 
+  filter(AREA != 'United States (comparable to ICD-O-2)') %>% 
+  filter(RACE != 'All Races') %>% 
+  filter(SEX == "Male and Female") %>% 
+  filter(YEAR == '2019') %>% 
+  filter(EVENT_TYPE == 'Mortality') %>% 
+  filter(SITE != 'All Cancer Sites Combined')
+
+View(anova_df)
+
+res_aov <- aov(incidence_100k ~ RACE,
+  data = anova_df
+)
+summary(res_aov)
+
+hist(res_aov$residuals)
+
+#library(car)
+#qqPlot(res_aov$residuals,
+  #id = FALSE # id = FALSE to remove point identification
+#)
+
+```

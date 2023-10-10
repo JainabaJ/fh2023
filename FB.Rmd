@@ -21,6 +21,29 @@ View(by_area_file)
 
 ```
 
+```{r data_exploration}
+# We added this chunk because it's always a good idea to inspect the data first. 
+# It looks like many of the categorical variables have an aggregated value.
+# This could throw off our counts or means when we do summarize().
+
+# Note that United States is a category -- "United States (comparable to ICD-O-2)". There is also some missing data in a few states. This could be interesting.
+by_area_file %>% count(AREA) %>% print(n = by_area_file %>% distinct(AREA) %>% pull() %>% length())
+
+# Note "Male and Female" is an aggregate measure.
+by_area_file %>% count(SEX)
+
+# Note that there is an aggregate year ("2016-2020")
+by_area_file %>% count(YEAR) %>% print(n = by_area_file %>% distinct(YEAR) %>% pull() %>% length())
+
+# Note "All Races" is aggregated
+by_area_file %>% count(RACE)
+
+# We'll need to choose Incidence OR Mortality
+by_area_file %>% count(EVENT_TYPE)
+
+# Choose cancer type, or all combined ("All Cancer Sites Combined")
+by_area_file %>% count(SITE) %>% print(n = by_area_file %>% distinct(SITE) %>% pull() %>% length())
+```
 
 ## preproccssing
 NOTES( talk about why i dropped ~)
@@ -28,6 +51,7 @@ when doing the gender graphs look to the SEX carefully
 
 ```{r preproccssing }
 by_area_df <- by_area_file %>% select(AREA,SEX,YEAR,POPULATION,RACE,EVENT_TYPE,SITE,AGE_ADJUSTED_RATE,COUNT)
+# We also probably want to include CRUDE_RATE in the line above. We speculate that the difference between this and AGE_ADJUSTED_RATE is based on the distribution of age by state, but it is good to compare them.
 by_area_df$RACE <- gsub("Non-Hispanic", "", by_area_df$RACE)
 by_area_df$COUNT <- as.numeric(gsub("[^0-9.]", "", by_area_df$COUNT))
 by_area <- by_area_df %>% na.omit()
@@ -44,8 +68,10 @@ colnames(by_area)
 
 filter this more to 'male and female'[SEX]
 ```{r total_incidence_by_race, echo=FALSE}
+# Make sure to filter out the aggregated area. Renaming total_incidence_by_race to something like total_incidence_count_by_race could also make it more clear what the values are.
 total_incidence_by_race <- by_area  %>% 
   group_by(RACE) %>% 
+  filter(AREA != "United States (comparable to ICD-O-2)") %>% 
   filter(EVENT_TYPE == 'Incidence') %>% 
   filter(SITE == "All Cancer Sites Combined") %>% 
   filter(SEX == 'Male and Female') %>% 
@@ -58,8 +84,13 @@ total_incidence_by_race
 ```
 
 ```{r total_incidence_by_race2, echo=FALSE}
+# Make sure we filter by EVENT_TYPE, AREA, and SITE
+# Renaming incidence_100k_by_race to something like mean_incidence_per100k_by_race could also make it more descriptive.
 incidence_100k_by_race <- by_area  %>% 
   group_by(RACE) %>% 
+  filter(AREA != "United States (comparable to ICD-O-2)") %>% 
+  filter(EVENT_TYPE == 'Incidence') %>% 
+  filter(SITE == "All Cancer Sites Combined") %>% 
   filter(SEX == 'Male and Female') %>%
   summarize(incidence_per_100k = mean(incidence_100k)) %>% 
   filter(RACE != 'All Races')
@@ -70,9 +101,13 @@ print(class(incidence_100k_by_race))
 
 ```{r mean_incidence_by_cancer_race}
 
+# Make sure we filter by EVENT_TYPE and AREA
+# Changed the plot titles slightly
 colnames(by_area)
 mean_incidence_by_cancer_race <- by_area %>%
   group_by(SITE,RACE)%>%
+  filter(AREA != "United States (comparable to ICD-O-2)") %>% 
+  filter(EVENT_TYPE == 'Mortality') %>% 
   filter(RACE != 'All Races') %>%
   filter(SEX == 'Male and Female') %>%
   filter(SITE != 'All Cancer Sites Combined') %>% 
@@ -81,7 +116,7 @@ mean_incidence_by_cancer_race <- by_area %>%
 View(mean_incidence_by_cancer_race)
 bar_plot_cancer <- ggplot(mean_incidence_by_cancer_race, aes(x = SITE, y = incidence_per_100k)) +
   geom_bar(stat = "identity", fill = "skyblue") +
-  labs(title = "Mean Cancer Incidence Rates by Cancer Site",
+  labs(title = "Mean Cancer Incidence per 100k by Cancer Site",
        x = "Cancer Site",
        y = "Mean Incidence Rate") +
   theme_minimal() +
@@ -89,7 +124,7 @@ bar_plot_cancer <- ggplot(mean_incidence_by_cancer_race, aes(x = SITE, y = incid
 
 bar_plot_cancer_vs_race <- ggplot(mean_incidence_by_cancer_race, aes(x = SITE, y = incidence_per_100k, fill = RACE)) +
   geom_bar(stat = "identity", position = "stack") +
-  labs(title = "Mean Cancer Incidence Rates by Cancer Site and Race",
+  labs(title = "Mean Cancer Incidence per 100k by Cancer Site and Race",
        x = "Cancer Site",
        y = "Mean Incidence Rate") +
   theme_minimal() +
@@ -97,7 +132,7 @@ bar_plot_cancer_vs_race <- ggplot(mean_incidence_by_cancer_race, aes(x = SITE, y
 
 box_plot_cancer_vs_race <- ggplot(mean_incidence_by_cancer_race, aes(x = RACE, y = incidence_per_100k)) +
   geom_boxplot() +
-  labs(title = "Box Plot of Cancer Incidence Rates by Racial and Ethnic Groups per 100,000 people",
+  labs(title = "Cancer Incidence per 100k by Racial and Ethnic Groups per 100,000 people",
        x = "Racial and Ethnic Groups",
        y = "Cancer Incidence Rate") +
   theme_minimal() +
